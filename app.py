@@ -10,27 +10,22 @@ from flask import Flask, render_template, url_for
 app = Flask(__name__)
 
 def create_plots():
+	address = 'postgres://u136kfhpq99ma7:p625fb4aa54d09cc85052c41d4cd1e712458b1ff00dd12cb6554cd92e136fe604@ec2-52-50-161-37.eu-west-1.compute.amazonaws.com:5432/d5icaceckkld4r'
+	conn = psycopg2.connect(address, sslmode='require')
+	cur = conn.cursor()
+	cur.execute("SELECT project_id, created_at FROM podcasts ORDER BY created_at DESC LIMIT 90000;")
+	all_results = cur.fetchall()
+	cur.execute("SELECT title, id FROM projects ORDER BY created_at;")
+	projects = cur.fetchall()
+	conn.close()
+
 	for interval in ['day','week','month']:
-		cmd = "SELECT project_id, created_at FROM podcasts ORDER BY created_at DESC LIMIT 90000;"
-		address = os.environ.get('SPKT_DB')
-		conn = psycopg2.connect(address, sslmode='require')
-		cur = conn.cursor()
-		cur.execute(cmd)
-		results = cur.fetchall()
-		conn.close()
-
-		cmd = "SELECT title, id FROM projects ORDER BY created_at;"
-		address = 'postgres://u136kfhpq99ma7:p625fb4aa54d09cc85052c41d4cd1e712458b1ff00dd12cb6554cd92e136fe604@ec2-52-50-161-37.eu-west-1.compute.amazonaws.com:5432/d5icaceckkld4r'
-		conn = psycopg2.connect(address, sslmode='require')
-		cur = conn.cursor()
-		cur.execute(cmd)
-		projects = cur.fetchall()
-		conn.close()
-
 		if interval == 'week':
-			results = results[:40000]
+			results = all_results[:40000]
 		if interval == 'day':
-			results = results[:15000]
+			results = all_results[:15000]
+		if interval == 'month':
+			results = all_results
 
 		project_dict = {pair[1]:pair[0] for pair in projects}
 
@@ -57,7 +52,6 @@ def create_plots():
 			top10 = Counter(podcasts).most_common(n_common)
 			top10_title = [(project_dict[pair[0]], pair[1]) for pair in top10] + [('Other', len(podcasts) - sum([pair[1] for pair in top10]))]  
 			data[day] = top10_title
-		data
 
 		cols = ['Other']
 		for day, v in data.items():
@@ -79,7 +73,7 @@ def create_plots():
 			d[publisher] = l   
 
 		df = pd.DataFrame(d)
-		rcParams.update({'font.size': 16})
+		rcParams.update({'font.size': 12})
 		plot = df.plot(kind='bar', stacked=True, rot=0, colormap='tab20c',zorder=3)
 		plot.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
 
@@ -95,7 +89,7 @@ def create_plots():
 
 		plot.set_xticklabels(ticklabels)
 		fig = plot.get_figure()
-		fig.set_size_inches(18, 10)
+		fig.set_size_inches(13, 6)
 		fig.savefig("static/{}.png".format(interval), bbox_inches='tight')
 
 
